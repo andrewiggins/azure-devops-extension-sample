@@ -1,5 +1,5 @@
 {
-  "name": "azure-devops-extension-sample",
+  "name": "playground-extension-sample",
   "version": "1.0.4",
   "description": "Sample Azure DevOps web extension",
   "keywords": [
@@ -10,7 +10,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Microsoft/azure-devops-extension-sample.git"
+    "url": "https://github.com/andrewiggins/azure-devops-extension-sample.git"
   },
   "scripts": {
     "clean": "rimraf ./dist",
@@ -36,8 +36,8 @@
     "@types/jest": "^26.0.3",
     "@types/react": "~16.8.2",
     "@types/react-dom": "~16.8.0",
-    "copy-webpack-plugin": "^7.0.0",
     "base64-inline-loader": "~1.1.1",
+    "copy-webpack-plugin": "^7.0.0",
     "css-loader": "~1.0.0",
     "jest": "^26.1.0",
     "jest-junit-reporter": "^1.1.0",
