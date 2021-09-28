@@ -25,23 +25,10 @@ interface SimpleDataState {
   ready?: boolean;
 }
 
-interface DocumentDataState {
-  type: "document";
-  collection: string;
-  id: string;
-  options?: IDocumentOptions;
-  currentText?: string;
-  persistedText?: string;
-  ready?: boolean;
-}
-
-type DataState = SimpleDataState | DocumentDataState;
+type DataState = SimpleDataState;
 
 type SetSimpleDataState = React.Dispatch<React.SetStateAction<SimpleDataState>>;
-type SetDocumentDataState = React.Dispatch<
-  React.SetStateAction<DocumentDataState>
->;
-type SetDataState = SetSimpleDataState | SetDocumentDataState;
+type SetDataState = SetSimpleDataState;
 
 function getInitialSimpleDataState(
   id: string,
@@ -76,9 +63,7 @@ async function getDataManager() {
   return _dataManagerRef.current;
 }
 
-async function getInitialData(
-  dataStates: Array<[DataState, React.Dispatch<React.SetStateAction<any>>]>
-) {
+async function getInitialData(dataStates: Array<[DataState, SetDataState]>) {
   const dataManager = await getDataManager();
   const newValues = await Promise.all(
     dataStates.map(([state, _]) => {
@@ -96,31 +81,17 @@ async function getInitialData(
   });
 }
 
-async function onPersistState(
-  state: DataState,
-  setValue: React.Dispatch<React.SetStateAction<any>>
-) {
+async function onPersistState(state: DataState, setValue: SetDataState) {
   setValue((prevState: any) => ({ ...prevState, ready: false }));
 
   const dataManager = await getDataManager();
 
   let result;
-  if (state.type == "simple") {
-    result = await dataManager.setValue(
-      state.id,
-      state.currentText || "",
-      state.options
-    );
-  } else {
-    result = await dataManager.setDocument(
-      state.collection,
-      {
-        id: state.id,
-        value: state.currentText,
-      },
-      state.options
-    );
-  }
+  result = await dataManager.setValue(
+    state.id,
+    state.currentText || "",
+    state.options
+  );
 
   console.log(state.id, "result", result);
   setValue((prevState: any) => ({
