@@ -29,7 +29,7 @@ class HubContent extends React.Component<{}, IHubContentState> {
         super(props);
 
         this.state = {
-            selectedTabId: "overview",
+            selectedTabId: "extensionData",
             fullScreenMode: false
         };
     }
