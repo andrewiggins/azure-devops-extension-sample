@@ -16,7 +16,8 @@ fs.readdirSync(samplesDir).filter(dir => {
 module.exports = {
     entry: entries,
     output: {
-        filename: "[name]/[name].js"
+        filename: "[name]/[name].js",
+        publicPath: "/dist/",
     },
     resolve: {
         extensions: [".ts", ".tsx", ".js"],
@@ -62,5 +63,9 @@ module.exports = {
                { from: "**/*.html", context: "src/Samples" }
            ]
         })
-    ]
+    ],
+    devServer: {
+        host: '127.0.0.1',
+        port: 7979
+    }
 };
