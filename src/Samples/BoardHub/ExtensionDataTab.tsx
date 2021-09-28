@@ -121,7 +121,7 @@ export const ExtensionDataTab: React.FC = () => {
   }, []);
 
   return (
-    <div className="page-content page-content-top rhythm-horizontal-16">
+    <div className="page-content page-content-top">
       {error && (
         <>
           <h2>ERROR</h2>
@@ -130,7 +130,7 @@ export const ExtensionDataTab: React.FC = () => {
           </div>
         </>
       )}
-      <div className=" flex-row ">
+      <div className="flex-row" style={{ gap: "16px" }}>
         <EditSimpleDataState
           label={simpleSharedValue.id}
           state={simpleSharedValue}
@@ -144,7 +144,7 @@ export const ExtensionDataTab: React.FC = () => {
           onPersistState={onPersistState}
         />
       </div>
-      <ManageDocumentCollection collectionName="test" />
+      <ManageDocumentCollection collectionName="shared-test" />
     </div>
   );
 };
@@ -180,26 +180,35 @@ interface Document {
 }
 
 interface ManageCollectionState {
-  state: "loading" | "idle" | "edit" | "editing";
+  state: "loading" | "edit" | "editing" | "deleting";
   documents: Document[];
   currentDocument: { current: string; persisted?: Document } | null;
   error: Error | null;
 }
 
 type LoadComplete = { type: "LOAD_COMPLETE"; documents: Document[] };
+type LoadError = { type: "LOAD_ERROR"; error: Error };
 type CreateDocument = { type: "CREATE_DOCUMENT" };
 type ShowDocument = { type: "SHOW_DOCUMENT"; id: string };
 type UpdateCurrent = { type: "UPDATE_CURRENT"; newValue: string };
 type SetDocumentStart = { type: "SET_DOCUMENT_START" };
 type SetDocumentFinish = { type: "SET_DOCUMENT_FINISH"; newDoc: Document };
+type DeleteDocumentStart = { type: "DELETE_DOCUMENT_START" };
+type DeleteDocumentFinish = {
+  type: "DELETE_DOCUMENT_FINISH";
+  deletedDoc: Document;
+};
 type EditError = { type: "EDIT_ERROR"; error: Error };
 type Action =
   | LoadComplete
+  | LoadError
   | CreateDocument
   | ShowDocument
   | UpdateCurrent
   | SetDocumentStart
   | SetDocumentFinish
+  | DeleteDocumentStart
+  | DeleteDocumentFinish
   | EditError;
 
 const initialState: ManageCollectionState = {
@@ -217,18 +226,29 @@ function usePrevious<T>(value: T): T | null {
   return ref.current ?? null;
 }
 
+const stringifyDoc = (doc?: Document) =>
+  doc ? JSON.stringify(doc, null, 2) : "";
+
 function reducer(
   state: ManageCollectionState,
   action: Action
 ): ManageCollectionState {
   switch (action.type) {
-    case "LOAD_COMPLETE":
+    case "LOAD_ERROR":
+    case "LOAD_COMPLETE": {
+      let documents = action.type == "LOAD_COMPLETE" ? action.documents : [];
+      let currentDoc = documents.length == 0 ? undefined : documents[0];
       return {
         ...state,
-        state: "idle",
-        documents: action.documents,
-        error: null,
+        state: "edit",
+        documents: documents,
+        currentDocument: {
+          current: stringifyDoc(currentDoc),
+          persisted: currentDoc,
+        },
+        error: action.type == "LOAD_ERROR" ? action.error : null,
       };
+    }
     case "CREATE_DOCUMENT":
       return {
         ...state,
@@ -247,7 +267,7 @@ function reducer(
         ...state,
         state: "edit",
         currentDocument: {
-          current: JSON.stringify(newDoc, null, 2),
+          current: stringifyDoc(newDoc),
           persisted: newDoc,
         },
         error: null,
@@ -288,12 +308,34 @@ function reducer(
         state: "edit",
         documents,
         currentDocument: {
-          current: JSON.stringify(newDoc, null, 2),
+          current: stringifyDoc(newDoc),
           persisted: newDoc,
         },
         error: null,
       };
     }
+    case "DELETE_DOCUMENT_START":
+      return { ...state, state: "deleting" };
+    case "DELETE_DOCUMENT_FINISH":
+      let deletedDoc = action.deletedDoc;
+      let deletedDocIndex = state.documents.findIndex(
+        (doc) => doc.id == deletedDoc.id
+      );
+      let documents = [
+        ...state.documents.slice(0, deletedDocIndex),
+        ...state.documents.slice(deletedDocIndex + 1),
+      ];
+      let nextDocIndex = Math.max(0, deletedDocIndex - 1);
+      let nextDoc = documents.length > 0 ? documents[nextDocIndex] : undefined;
+      return {
+        ...state,
+        state: "edit",
+        documents,
+        currentDocument: {
+          current: stringifyDoc(nextDoc),
+          persisted: nextDoc,
+        },
+      };
     case "EDIT_ERROR":
       return {
         ...state,
@@ -309,41 +351,90 @@ const ManageDocumentCollection: React.FC<{
   options?: IDocumentOptions;
 }> = ({ collectionName, options }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const isDisabledState = state.state == "editing" || state.state == "deleting";
+  const showDocEditor =
+    state.state == "edit" ||
+    state.state == "editing" ||
+    state.state == "deleting";
 
   useEffect(() => {
     if (state.state == "loading") {
       (async () => {
-        const dataManager = await getDataManager();
-        const documents = await dataManager.getDocuments(
-          collectionName,
-          options
-        );
-        dispatch({ type: "LOAD_COMPLETE", documents });
+        try {
+          const dataManager = await getDataManager();
+          const documents = await dataManager.getDocuments(
+            collectionName,
+            options
+          );
+          dispatch({ type: "LOAD_COMPLETE", documents });
+        } catch (e) {
+          console.log(e);
+          if ((e as any).status === 404) {
+            dispatch({ type: "LOAD_COMPLETE", documents: [] });
+          } else {
+            dispatch({ type: "LOAD_ERROR", error: e as Error });
+          }
+        }
       })();
     } else if (state.state == "editing") {
       (async () => {
         const dataManager = await getDataManager();
-        let newDoc = await dataManager.setDocument(
-          collectionName,
-          state.currentDocument?.current,
-          options
-        );
-        dispatch({ type: "SET_DOCUMENT_FINISH", newDoc });
+        try {
+          if (!state.currentDocument) {
+            throw new Error("state.currentDocument is null. Is likely a bug.");
+          }
+
+          let newDoc = await dataManager.setDocument(
+            collectionName,
+            JSON.parse(state.currentDocument.current),
+            options
+          );
+          dispatch({ type: "SET_DOCUMENT_FINISH", newDoc });
+        } catch (e) {
+          console.error(e);
+          dispatch({ type: "EDIT_ERROR", error: e as Error });
+        }
+      })();
+    } else if (state.state == "deleting") {
+      (async () => {
+        const dataManager = await getDataManager();
+        try {
+          if (
+            state.currentDocument == null ||
+            state.currentDocument.persisted == null
+          ) {
+            throw new Error("state.currentDocument is null. Is likely a bug.");
+          }
+
+          let deletedDoc = state.currentDocument.persisted;
+          await dataManager.deleteDocument(
+            collectionName,
+            deletedDoc.id,
+            options
+          );
+          dispatch({ type: "DELETE_DOCUMENT_FINISH", deletedDoc });
+        } catch (e) {
+          console.error(e);
+          dispatch({ type: "EDIT_ERROR", error: e as Error });
+        }
       })();
     }
   }, [state.state]);
 
   if (state.state == "loading") {
     return (
-      <div>Loading documents from the "{collectionName}" collection...</div>
+      <div style={{ marginTop: "1rem" }}>
+        <h2>{collectionName} Documents</h2>
+        Loading documents from the "{collectionName}" collection...
+      </div>
     );
   }
 
   return (
-    <div>
+    <div style={{ marginTop: "1rem" }}>
       <h2>{collectionName} Documents</h2>
       <div>
-        <label>Select a document</label>
+        <label style={{ marginRight: "1rem" }}>Select a document:</label>
         <select
           value={
             state.currentDocument == null ||
@@ -370,15 +461,17 @@ const ManageDocumentCollection: React.FC<{
           </option>
         </select>
       </div>
-      {(state.state == "edit" || state.state == "editing") && (
-        <div>
+      {showDocEditor && (
+        <div style={{ marginTop: "1rem" }}>
           <textarea
-            disabled={state.state == "editing"}
-            value={
-              state.currentDocument
-                ? JSON.stringify(state.currentDocument, null, 2)
-                : ""
-            }
+            style={{
+              display: "block",
+              fontFamily: "monospace",
+              width: "300px",
+              height: "200px",
+            }}
+            disabled={isDisabledState}
+            value={state.currentDocument ? state.currentDocument.current : ""}
             onChange={(e) =>
               dispatch({
                 type: "UPDATE_CURRENT",
@@ -387,7 +480,7 @@ const ManageDocumentCollection: React.FC<{
             }
           ></textarea>
           <Button
-            disabled={state.state == "editing"}
+            disabled={isDisabledState || state.currentDocument?.current == ""}
             onClick={() => {
               if (!state.currentDocument) {
                 dispatch({
@@ -416,6 +509,16 @@ const ManageDocumentCollection: React.FC<{
           >
             {state.currentDocument?.persisted == null ? "Create" : "Edit"}
           </Button>
+          {state.currentDocument?.persisted != null && (
+            <Button
+              disabled={isDisabledState || state.currentDocument?.current == ""}
+              onClick={() => {
+                dispatch({ type: "DELETE_DOCUMENT_START" });
+              }}
+            >
+              Delete
+            </Button>
+          )}
           {state.error && <p>{state.error.toString()}</p>}
         </div>
       )}
