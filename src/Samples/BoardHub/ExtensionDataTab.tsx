@@ -54,10 +54,14 @@ async function getDataManager() {
     const extDataService = await SDK.getService<IExtensionDataService>(
       CommonServiceIds.ExtensionDataService
     );
+
     _dataManagerRef.current = await extDataService.getExtensionDataManager(
       SDK.getExtensionContext().id,
       accessToken
     );
+
+    // @ts-ignore
+    window.dataManager = _dataManagerRef.current;
   }
 
   return _dataManagerRef.current;
@@ -144,7 +148,12 @@ export const ExtensionDataTab: React.FC = () => {
           onPersistState={onPersistState}
         />
       </div>
+      {/* <ManageDocumentCollection collectionName="test" /> */}
       <ManageDocumentCollection collectionName="shared-test" />
+      <ManageDocumentCollection
+        collectionName="user-test"
+        options={{ scopeType: "User", scopeValue: "Me" }}
+      />
     </div>
   );
 };
