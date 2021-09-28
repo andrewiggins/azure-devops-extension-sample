@@ -7,15 +7,12 @@
         "noImplicitAny": true,
         "noImplicitThis": true,
         "strict": true,
-        "target": "es5",
+        "target": "ES2019",
         "rootDir": "src/",
         "outDir": "dist/",
         "jsx": "react",
         "lib": [
-          "es5",
-          "es6",
           "dom",
-          "es2015.promise"
         ],
         "types": [
             "react",
