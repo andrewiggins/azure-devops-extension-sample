@@ -90,8 +90,7 @@ async function onPersistState(state: DataState, setValue: SetDataState) {
 
   const dataManager = await getDataManager();
 
-  let result;
-  result = await dataManager.setValue(
+  let result = await dataManager.setValue(
     state.id,
     state.currentText || "",
     state.options
@@ -266,7 +265,7 @@ function reducer(
           current: "",
         },
       };
-    case "SHOW_DOCUMENT":
+    case "SHOW_DOCUMENT": {
       let newDoc = state.documents.find((doc) => doc.id == action.id);
       if (!newDoc) {
         throw new Error("Could not find document: " + action.id);
@@ -281,6 +280,7 @@ function reducer(
         },
         error: null,
       };
+    }
     case "UPDATE_CURRENT":
       return {
         ...state,
@@ -325,7 +325,7 @@ function reducer(
     }
     case "DELETE_DOCUMENT_START":
       return { ...state, state: "deleting" };
-    case "DELETE_DOCUMENT_FINISH":
+    case "DELETE_DOCUMENT_FINISH": {
       let deletedDoc = action.deletedDoc;
       let deletedDocIndex = state.documents.findIndex(
         (doc) => doc.id == deletedDoc.id
@@ -345,6 +345,7 @@ function reducer(
           persisted: nextDoc,
         },
       };
+    }
     case "EDIT_ERROR":
       return {
         ...state,
@@ -358,13 +359,25 @@ function reducer(
 const ManageDocumentCollection: React.FC<{
   collectionName: string;
   options?: IDocumentOptions;
-}> = ({ collectionName, options }) => {
+}> = (props) => {
+  const { collectionName, options } = props;
   const [state, dispatch] = useReducer(reducer, initialState);
   const isDisabledState = state.state == "editing" || state.state == "deleting";
   const showDocEditor =
     state.state == "edit" ||
     state.state == "editing" ||
     state.state == "deleting";
+
+  // TODO: Deal with props changing later
+  // let prevProps = usePrevious(props);
+  // if (
+  //   state.state !== "loading" &&
+  //   (props.collectionName != prevProps?.collectionName ||
+  //     props.options?.scopeType != prevProps?.options?.scopeType ||
+  //     props.options?.scopeValue != prevProps.options?.scopeValue)
+  // ) {
+  // 	dispatch({ type: "LOAD_START" });
+  // }
 
   useEffect(() => {
     if (state.state == "loading") {
