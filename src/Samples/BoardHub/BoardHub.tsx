@@ -14,6 +14,9 @@ import { NavigationTab } from "./NavigationTab";
 import { ExtensionDataTab } from "./ExtensionDataTab";
 import { MessagesTab } from "./MessagesTab";
 import { showRootComponent } from "../../Common";
+import { getAllSDKDebugInfo } from "./debug";
+
+getAllSDKDebugInfo().then((data) => console.log(data));
 
 interface IHubContentState {
     selectedTabId: string;
